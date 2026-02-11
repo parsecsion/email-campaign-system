@@ -39,6 +39,7 @@ class Config:
     EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
     MAX_RECIPIENTS = int(os.getenv("MAX_RECIPIENTS", "100"))
     RATE_LIMIT_DELAY = float(os.getenv("RATE_LIMIT_DELAY", "2.0"))
+    RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
 
     # Admin – MUST be provided explicitly (no insecure defaults)
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")

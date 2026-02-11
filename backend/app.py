@@ -81,7 +81,8 @@ CORS(app, origins=Config.CORS_ORIGINS, supports_credentials=True)
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["1000 per hour", "100 per minute"]
+    default_limits=["1000 per hour", "100 per minute"],
+    storage_uri=Config.RATELIMIT_STORAGE_URI,
 )
 
 # SMTP Configuration
