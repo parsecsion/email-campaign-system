@@ -3,6 +3,15 @@ import sys
 
 import pytest
 
+# Provide safe defaults before importing the Flask app.
+#
+# The application config validates SECRET_KEY at import time, so tests should
+# bootstrap required variables before importing app/config modules.
+os.environ.setdefault("SECRET_KEY", "test-secret-key-32-bytes-minimum!!")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-32-bytes-min!!")
+os.environ.setdefault("ADMIN_EMAIL", "admin@example.com")
+os.environ.setdefault("ADMIN_PASSWORD", "admin123")
+
 # Ensure backend package is importable
 BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if BACKEND_ROOT not in sys.path:
@@ -25,16 +34,8 @@ def auth_headers(client):
 
     Tests assume ADMIN_EMAIL/ADMIN_PASSWORD are configured for the test run.
     """
-    admin_email = os.getenv("ADMIN_EMAIL", "admin@example.com")
-    admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
-
-    # Ensure app is configured with these defaults if not set
-    # (This assumes the app uses config.py which might need these to start, 
-    # but for tests we might need to patch Config)
-    if not os.getenv("ADMIN_EMAIL"):
-        os.environ["ADMIN_EMAIL"] = admin_email
-    if not os.getenv("ADMIN_PASSWORD"):
-        os.environ["ADMIN_PASSWORD"] = admin_pass
+    admin_email = os.environ["ADMIN_EMAIL"]
+    admin_pass = os.environ["ADMIN_PASSWORD"]
 
     assert admin_email, "ADMIN_EMAIL must be set in test environment"
     assert admin_pass, "ADMIN_PASSWORD must be set in test environment"
@@ -57,4 +58,3 @@ def db_session():
         yield session
     finally:
         session.close()
-
