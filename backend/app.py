@@ -106,15 +106,6 @@ if not ADMIN_EMAIL or not ADMIN_PASSWORD:
 from pydantic import ValidationError
 from schemas import EmailCampaignRequest
 
-# ... (imports)
-
-# Delete validate_input function completely (it's around line 96-159)
-
-# ...
-
-
-# Helper functions moved to backend/utils.py
-
 @app.route('/api/token', methods=['POST'])
 @limiter.limit("5 per minute")
 def create_token():
@@ -600,7 +591,7 @@ def get_system_logs():
     """Get system logs"""
     try:
         lines = request.args.get('lines', default=100, type=int)
-        log_file = 'email_campaign.log'
+        log_file = LOG_FILE
         
         if not os.path.exists(log_file):
             return jsonify({'logs': []}), 200
@@ -620,8 +611,9 @@ def get_system_logs():
 def clear_system_logs():
     """Clear system logs"""
     try:
-        log_file = 'email_campaign.log'
+        log_file = LOG_FILE
         # Open in write mode to truncate
+        os.makedirs(os.path.dirname(log_file) or '.', exist_ok=True)
         with open(log_file, 'w') as f:
             f.write(f"{datetime.now()} - System - INFO - Logs cleared by user\n")
         return jsonify({'success': True, 'message': 'Logs cleared'}), 200
