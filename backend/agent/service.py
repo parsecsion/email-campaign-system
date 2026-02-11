@@ -7,11 +7,21 @@ from agent.tools import AgentTools
 
 logger = logging.getLogger(__name__)
 
-# Initialize OpenAI client (supports OpenRouter)
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY"),
-)
+# Initialize OpenAI client (supports OpenRouter).
+# For local tests / CI where no key is configured, we avoid failing at import
+# time and simply disable the agent.
+_OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
+
+if _OPENROUTER_API_KEY:
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=_OPENROUTER_API_KEY,
+    )
+else:
+    client = None
+    logger.warning(
+        "OpenRouter/OpenAI API key not configured; AgentService will be disabled for this deployment."
+    )
 
 SYSTEM_PROMPT = """
 You are the AI Commander for the Email Campaign System.
@@ -61,6 +71,14 @@ class AgentService:
         6. Return final response
         """
         try:
+            if client is None:
+                # Agent is not configured (e.g. tests, CI, or local env without key).
+                logger.error("AgentService called but OpenRouter/OpenAI API key is not configured.")
+                return {
+                    "content": "The AI assistant is not configured on this deployment.",
+                    "meta": {},
+                }
+
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             dynamic_system_prompt = f"{SYSTEM_PROMPT}\nCurrent Time: {current_time}"
             
