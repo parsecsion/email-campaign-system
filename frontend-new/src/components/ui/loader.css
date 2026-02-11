@@ -1,0 +1,101 @@
+.ripple-loader {
+    --cell-size: 10px;
+    --cell-spacing: 2px;
+    --cells: 3;
+    --total-size: calc(var(--cells) * (var(--cell-size) + 2 * var(--cell-spacing)));
+    display: flex;
+    flex-wrap: wrap;
+    width: var(--total-size);
+    height: var(--total-size);
+}
+
+.ripple-loader.small {
+    --cell-size: 4px;
+    --cell-spacing: 1px;
+}
+
+.ripple-cell {
+    flex: 0 0 var(--cell-size);
+    margin: var(--cell-spacing);
+    background-color: transparent;
+    box-sizing: border-box;
+    border-radius: 2px;
+    animation: 1.5s ripple ease infinite;
+}
+
+.ripple-loader.small .ripple-cell {
+    border-radius: 1px;
+}
+
+.ripple-cell.d-1 {
+    animation-delay: 100ms;
+}
+
+.ripple-cell.d-2 {
+    animation-delay: 200ms;
+}
+
+.ripple-cell.d-3 {
+    animation-delay: 300ms;
+}
+
+.ripple-cell.d-4 {
+    animation-delay: 400ms;
+}
+
+/* Brand Theme Colors (#00ffcb shades) */
+/* We create a gradient effect using opacity or slight hue shifts */
+.ripple-cell:nth-child(1) {
+    --cell-color: rgba(0, 255, 203, 0.2);
+}
+
+.ripple-cell:nth-child(2) {
+    --cell-color: rgba(0, 255, 203, 0.3);
+}
+
+.ripple-cell:nth-child(3) {
+    --cell-color: rgba(0, 255, 203, 0.4);
+}
+
+.ripple-cell:nth-child(4) {
+    --cell-color: rgba(0, 255, 203, 0.5);
+}
+
+.ripple-cell:nth-child(5) {
+    --cell-color: rgba(0, 255, 203, 0.6);
+}
+
+.ripple-cell:nth-child(6) {
+    --cell-color: rgba(0, 255, 203, 0.7);
+}
+
+.ripple-cell:nth-child(7) {
+    --cell-color: rgba(0, 255, 203, 0.8);
+}
+
+.ripple-cell:nth-child(8) {
+    --cell-color: rgba(0, 255, 203, 0.9);
+}
+
+.ripple-cell:nth-child(9) {
+    --cell-color: #00ffcb;
+}
+
+/* Animation */
+@keyframes ripple {
+    0% {
+        background-color: transparent;
+    }
+
+    30% {
+        background-color: var(--cell-color);
+    }
+
+    60% {
+        background-color: transparent;
+    }
+
+    100% {
+        background-color: transparent;
+    }
+}

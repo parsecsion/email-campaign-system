@@ -1,0 +1,436 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+}
+
+@layer base {
+  html {
+    font-size: 75%;
+    /* Equivalent to zoom 0.75 for rem-based layouts */
+  }
+
+  body {
+    @apply bg-gray-100 font-sans text-gray-900;
+  }
+
+  ::selection {
+    background-color: theme('colors.brand.DEFAULT');
+    color: black;
+  }
+}
+
+/* Sidebar Active State Accent */
+.sidebar-item.active {
+  color: theme('colors.brand.DEFAULT');
+  background: rgba(0, 255, 203, 0.05);
+  /* Very subtle tint */
+  border-right: 2px solid theme('colors.brand.DEFAULT');
+}
+
+/* Custom Styles from original index.html */
+
+* {
+  font-family: 'Inter', sans-serif;
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ink-card {
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  border-radius: 0;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+}
+
+.status-badge {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.candidate-item {
+  transition: all 0.2s ease;
+  overflow: visible;
+  margin-right: 4px;
+}
+
+.candidate-item:hover {
+  background: #f9fafb;
+  border-color: #000000;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.candidate-item:hover .candidate-content {
+  transform: translateX(2px);
+}
+
+.candidate-content {
+  transition: transform 0.2s ease;
+}
+
+.interview-item {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.interview-item:hover {
+  border-color: #000000;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Status-specific hover colors - retain shade of status color */
+.interview-item.bg-green-50:hover {
+  background: #d1fae5;
+}
+
+.interview-item.bg-yellow-50:hover {
+  background: #fef3c7;
+}
+
+.interview-item.bg-red-50:hover {
+  background: #fee2e2;
+}
+
+.interview-item.bg-blue-50:hover {
+  background: #dbeafe;
+}
+
+.interview-item.bg-orange-50:hover {
+  background: #fed7aa;
+}
+
+.interview-item.bg-purple-50:hover {
+  background: #e9d5ff;
+}
+
+.interview-item.bg-white:hover,
+.interview-item.bg-gray-50:hover {
+  background: #f9fafb;
+}
+
+.interview-item:hover .interview-content {
+  transform: translateX(2px);
+}
+
+.interview-content {
+  transition: transform 0.2s ease;
+}
+
+.interview-item[draggable="true"] {
+  cursor: move;
+  transition: all 0.2s ease;
+}
+
+.interview-item[draggable="true"]:hover {
+  cursor: grab;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.interview-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.interview-item.dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+  transition: all 0.2s ease;
+}
+
+.drop-zone-active {
+  border-color: #3b82f6 !important;
+  background-color: #eff6ff !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  transition: all 0.2s ease;
+}
+
+.template-item {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.template-item:hover {
+  background: #f9fafb;
+  border-color: #000000;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.template-item:hover .template-content {
+  transform: translateX(2px);
+}
+
+.template-content {
+  transition: transform 0.2s ease;
+}
+
+.email-item {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.email-item:hover {
+  background: #f9fafb;
+  border-color: #000000;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.email-item:hover .email-content {
+  transform: translateX(2px);
+}
+
+.email-content {
+  transition: transform 0.2s ease;
+}
+
+.data-row {
+  transition: all 0.2s ease;
+  position: relative;
+  /* For z-index to work */
+}
+
+.data-row:hover {
+  background-color: #f9fafb !important;
+  /* Force override */
+  outline: 1px solid #000000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+}
+
+.drawer-enter {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.drawer-enter-active {
+  max-height: 3000px;
+  opacity: 1;
+}
+
+.drawer-exit {
+  max-height: 3000px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.drawer-exit-active {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* Global Scrollbar Styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db #f3f4f6;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.dropdown-container {
+  position: relative;
+}
+
+.dropdown-button {
+  transition: all 0.2s ease;
+}
+
+.dropdown-button:hover {
+  background: #f9fafb;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.dropdown-menu.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.dropdown-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #f3f4f6;
+  border-radius: 0;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: #f9fafb;
+  color: #000000;
+}
+
+.dropdown-item.selected {
+  background: #000000;
+  color: white;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+}
+
+.delete-icon-hover {
+  transition: all 0.2s ease;
+}
+
+.delete-icon-hover:hover {
+  color: #dc2626;
+  filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));
+  transform: scale(1.1);
+}
+
+.sidebar {
+  width: 56px;
+  min-width: 56px;
+  background: #000000;
+  border-right: 1px solid #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 50;
+  justify-content: space-between;
+}
+
+.sidebar-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.sidebar-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 20px;
+  width: 100%;
+}
+
+.sidebar-item {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+  border-radius: 0;
+  color: #9ca3af;
+}
+
+.sidebar-item:hover {
+  background: #1a1a1a;
+  color: white;
+}
+
+.sidebar-item.active {
+  background: #1a1a1a;
+  color: white;
+}
+
+.sidebar-item.active:hover {
+  background: #2a2a2a;
+}
+
+.main-content {
+  margin-left: 56px;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}

@@ -1,0 +1,39 @@
+name: Backend Tests
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run backend tests
+        env:
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          SECRET_KEY: test_secret_key
+          JWT_SECRET_KEY: test_jwt_secret_key
+        run: |
+          pytest backend/tests -q
+

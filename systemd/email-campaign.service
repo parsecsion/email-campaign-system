@@ -1,0 +1,28 @@
+[Unit]
+Description=Email Campaign System
+After=network.target
+
+[Service]
+Type=exec
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/email-campaign-system
+Environment=PATH=/opt/email-campaign-system/venv/bin
+ExecStart=/opt/email-campaign-system/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/email-campaign-system/logs /opt/email-campaign-system/data
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
