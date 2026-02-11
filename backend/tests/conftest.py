@@ -3,6 +3,15 @@ import sys
 
 import pytest
 
+# Provide safe defaults before importing the Flask app.
+#
+# The application config validates SECRET_KEY at import time, so tests should
+# bootstrap required variables before importing app/config modules.
+os.environ.setdefault("SECRET_KEY", "test-secret-key-32-bytes-minimum!!")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-32-bytes-min!!")
+os.environ.setdefault("ADMIN_EMAIL", "admin@example.com")
+os.environ.setdefault("ADMIN_PASSWORD", "admin123")
+
 # Ensure backend package is importable
 BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if BACKEND_ROOT not in sys.path:
@@ -10,6 +19,8 @@ if BACKEND_ROOT not in sys.path:
 
 from app import app  # noqa: E402
 from database import get_session  # noqa: E402
+
+_CACHED_TEST_TOKEN = None
 
 
 @pytest.fixture
@@ -23,18 +34,16 @@ def auth_headers(client):
     """
     Obtain an auth token using admin credentials from the environment.
 
-    Tests assume ADMIN_EMAIL/ADMIN_PASSWORD are configured for the test run.
+    Caches a token for the whole pytest process to avoid triggering
+    /api/token rate limits when many tests request auth headers.
     """
-    admin_email = os.getenv("ADMIN_EMAIL", "admin@example.com")
-    admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+    global _CACHED_TEST_TOKEN
 
-    # Ensure app is configured with these defaults if not set
-    # (This assumes the app uses config.py which might need these to start, 
-    # but for tests we might need to patch Config)
-    if not os.getenv("ADMIN_EMAIL"):
-        os.environ["ADMIN_EMAIL"] = admin_email
-    if not os.getenv("ADMIN_PASSWORD"):
-        os.environ["ADMIN_PASSWORD"] = admin_pass
+    if _CACHED_TEST_TOKEN:
+        return {"Authorization": f"Bearer {_CACHED_TEST_TOKEN}"}
+
+    admin_email = os.environ["ADMIN_EMAIL"]
+    admin_pass = os.environ["ADMIN_PASSWORD"]
 
     assert admin_email, "ADMIN_EMAIL must be set in test environment"
     assert admin_pass, "ADMIN_PASSWORD must be set in test environment"
@@ -42,8 +51,8 @@ def auth_headers(client):
     resp = client.post("/api/token", json={"email": admin_email, "password": admin_pass})
     assert resp.status_code == 200, f"Failed to obtain token: {resp.data}"
 
-    token = resp.json["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    _CACHED_TEST_TOKEN = resp.json["access_token"]
+    return {"Authorization": f"Bearer {_CACHED_TEST_TOKEN}"}
 
 
 @pytest.fixture
@@ -57,4 +66,3 @@ def db_session():
         yield session
     finally:
         session.close()
-
