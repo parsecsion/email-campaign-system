@@ -92,14 +92,15 @@ export const AgentInterface = ({ onClose, isOverlay = false }) => {
     // --- Helper Components ---
 
     const ConfirmationCard = ({ request, disabled }) => {
-        const { tool, args } = request;
+        const { tool, args, confirmation_id: confirmationId } = request;
 
         // Format tool name for display (e.g., "delete_interview" -> "Delete Interview")
         const actionName = tool.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
         const handleConfirm = () => {
             if (disabled) return;
-            handleCommand(`CONFIRMED: ${tool}`);
+            if (!confirmationId) return;
+            handleCommand(`CONFIRMED: ${confirmationId}`);
         };
 
         const handleCancel = () => {
