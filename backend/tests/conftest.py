@@ -37,6 +37,12 @@ def auth_headers(client):
     Caches a token for the whole pytest process to avoid triggering
     /api/token rate limits when many tests request auth headers.
     """
+    global _CACHED_TEST_TOKEN
+    
+    # Return cached token if available
+    if _CACHED_TEST_TOKEN:
+        return {"Authorization": f"Bearer {_CACHED_TEST_TOKEN}"}
+    
     admin_email = os.environ["ADMIN_EMAIL"]
     admin_pass = os.environ["ADMIN_PASSWORD"]
 
