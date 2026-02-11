@@ -380,26 +380,34 @@ def get_campaign_status(task_id):
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint with detailed status"""
+    """
+    Health check endpoint.
+
+    By default this is a fast liveness/readiness probe and does not perform
+    network calls. Use `?include_smtp=1` for an explicit SMTP connectivity check.
+    """
     try:
-        # Test SMTP connection
-        smtp_status = "unknown"
-        if EMAIL_PASSWORD:
-            try:
-                context = ssl.create_default_context()
-                with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context, timeout=10) as server:
-                    smtp_status = "connected"
-            except Exception as e:
-                smtp_status = f"error: {str(e)}"
-        else:
-            smtp_status = "not_configured"
-        
+        include_smtp = request.args.get('include_smtp', '0') in {'1', 'true', 'yes'}
+        smtp_status = "skipped"
+
+        if include_smtp:
+            if EMAIL_PASSWORD:
+                try:
+                    context = ssl.create_default_context()
+                    with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context, timeout=10):
+                        smtp_status = "connected"
+                except Exception as e:
+                    smtp_status = f"error: {str(e)}"
+            else:
+                smtp_status = "not_configured"
+
         return jsonify({
             'status': 'healthy',
             'message': 'Email campaign system is running',
             'version': '1.0.0',
             'timestamp': datetime.now().isoformat(),
             'smtp_status': smtp_status,
+            'smtp_check_performed': include_smtp,
             'max_recipients': MAX_RECIPIENTS,
             'rate_limit_delay': RATE_LIMIT_DELAY
         })
