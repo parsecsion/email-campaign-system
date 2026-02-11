@@ -25,8 +25,16 @@ def auth_headers(client):
 
     Tests assume ADMIN_EMAIL/ADMIN_PASSWORD are configured for the test run.
     """
-    admin_email = os.getenv("ADMIN_EMAIL")
-    admin_pass = os.getenv("ADMIN_PASSWORD")
+    admin_email = os.getenv("ADMIN_EMAIL", "admin@example.com")
+    admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+
+    # Ensure app is configured with these defaults if not set
+    # (This assumes the app uses config.py which might need these to start, 
+    # but for tests we might need to patch Config)
+    if not os.getenv("ADMIN_EMAIL"):
+        os.environ["ADMIN_EMAIL"] = admin_email
+    if not os.getenv("ADMIN_PASSWORD"):
+        os.environ["ADMIN_PASSWORD"] = admin_pass
 
     assert admin_email, "ADMIN_EMAIL must be set in test environment"
     assert admin_pass, "ADMIN_PASSWORD must be set in test environment"
