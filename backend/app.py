@@ -81,7 +81,8 @@ CORS(app, origins=Config.CORS_ORIGINS, supports_credentials=True)
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["1000 per hour", "100 per minute"]
+    default_limits=["1000 per hour", "100 per minute"],
+    storage_uri=Config.RATELIMIT_STORAGE_URI,
 )
 
 # SMTP Configuration
@@ -104,15 +105,6 @@ if not ADMIN_EMAIL or not ADMIN_PASSWORD:
 
 from pydantic import ValidationError
 from schemas import EmailCampaignRequest
-
-# ... (imports)
-
-# Delete validate_input function completely (it's around line 96-159)
-
-# ...
-
-
-# Helper functions moved to backend/utils.py
 
 @app.route('/api/token', methods=['POST'])
 @limiter.limit("5 per minute")
@@ -552,41 +544,131 @@ def handle_single_draft(draft_id):
     finally:
         session.close()
 
+
+SENSITIVE_SETTINGS_MASK = "********"
+ALLOWED_SETTINGS_KEYS = {
+    "app_name",
+    "admin_email",
+    "recruitment_countries",
+    "default_country",
+    "authorized_senders",
+    "smtp_configs",
+    "reply_to",
+    "daily_send_limit",
+    "email_rate_limit",
+    "agent_api_key",
+    "agent_models",
+    "agent_default_model",
+    "status_email_mappings",
+    "company_emails",
+    "theme",
+}
+
+
+def _deserialize_setting_value(raw_value):
+    try:
+        return json.loads(raw_value)
+    except Exception:
+        return raw_value
+
+
+def _serialize_setting_value(value):
+    return json.dumps(value) if isinstance(value, (list, dict)) else str(value)
+
+
+def _mask_sensitive_settings(settings_dict):
+    masked = dict(settings_dict)
+
+    if masked.get("agent_api_key"):
+        masked["agent_api_key"] = SENSITIVE_SETTINGS_MASK
+
+    smtp_configs = masked.get("smtp_configs")
+    if isinstance(smtp_configs, dict):
+        safe_configs = {}
+        for sender, cfg in smtp_configs.items():
+            if isinstance(cfg, dict):
+                cfg_copy = dict(cfg)
+                if cfg_copy.get("password"):
+                    cfg_copy["password"] = SENSITIVE_SETTINGS_MASK
+                safe_configs[sender] = cfg_copy
+            else:
+                safe_configs[sender] = cfg
+        masked["smtp_configs"] = safe_configs
+
+    return masked
+
+
+def _merge_secret_settings(existing_values, incoming_values):
+    merged = dict(incoming_values)
+
+    existing_api_key = existing_values.get("agent_api_key")
+    incoming_api_key = merged.get("agent_api_key")
+    if incoming_api_key == SENSITIVE_SETTINGS_MASK and existing_api_key is not None:
+        merged["agent_api_key"] = existing_api_key
+
+    incoming_smtp = merged.get("smtp_configs")
+    existing_smtp = existing_values.get("smtp_configs")
+    if isinstance(incoming_smtp, dict):
+        safe_smtp = {}
+        for sender, cfg in incoming_smtp.items():
+            if not isinstance(cfg, dict):
+                safe_smtp[sender] = cfg
+                continue
+
+            cfg_copy = dict(cfg)
+            incoming_pw = cfg_copy.get("password")
+            existing_pw = None
+            if isinstance(existing_smtp, dict):
+                existing_cfg = existing_smtp.get(sender)
+                if isinstance(existing_cfg, dict):
+                    existing_pw = existing_cfg.get("password")
+
+            if incoming_pw == SENSITIVE_SETTINGS_MASK:
+                cfg_copy["password"] = existing_pw or ""
+            elif incoming_pw is None and existing_pw:
+                cfg_copy["password"] = existing_pw
+
+            safe_smtp[sender] = cfg_copy
+
+        merged["smtp_configs"] = safe_smtp
+
+    return merged
+
 @app.route('/api/settings', methods=['GET', 'POST'])
 @jwt_required()
 def handle_settings():
-    """Handle application settings"""
+    """Handle application settings with key allow-listing and secret masking."""
     session = get_session()
     try:
         if request.method == 'GET':
             settings = session.query(Settings).all()
-            settings_dict = {}
-            for s in settings:
-                # Try to parse JSON if it looks like a list or dict
-                import json
-                try:
-                    settings_dict[s.key] = json.loads(s.value)
-                except:
-                    settings_dict[s.key] = s.value
-            return jsonify({'settings': settings_dict}), 200
-            
-        elif request.method == 'POST':
-            data = request.json
-            import json
-            
-            for key, value in data.items():
-                setting = session.query(Settings).filter_by(key=key).first()
-                val_str = json.dumps(value) if isinstance(value, (list, dict)) else str(value)
-                
-                if setting:
-                    setting.value = val_str
-                else:
-                    setting = Settings(key=key, value=val_str)
-                    session.add(setting)
-            
-            session.commit()
-            return jsonify({'success': True, 'message': 'Settings updated'}), 200
-            
+            settings_dict = {s.key: _deserialize_setting_value(s.value) for s in settings}
+            return jsonify({'settings': _mask_sensitive_settings(settings_dict)}), 200
+
+        data = request.json or {}
+        unknown_keys = sorted(set(data.keys()) - ALLOWED_SETTINGS_KEYS)
+        if unknown_keys:
+            return jsonify({
+                'error': 'Unknown setting keys',
+                'unknown_keys': unknown_keys,
+            }), 400
+
+        existing_rows = session.query(Settings).all()
+        existing_values = {row.key: _deserialize_setting_value(row.value) for row in existing_rows}
+        merged_data = _merge_secret_settings(existing_values, data)
+
+        for key, value in merged_data.items():
+            setting = session.query(Settings).filter_by(key=key).first()
+            val_str = _serialize_setting_value(value)
+
+            if setting:
+                setting.value = val_str
+            else:
+                session.add(Settings(key=key, value=val_str))
+
+        session.commit()
+        return jsonify({'success': True, 'message': 'Settings updated'}), 200
+
     except Exception as e:
         logger.error(f"Settings error: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -599,7 +681,7 @@ def get_system_logs():
     """Get system logs"""
     try:
         lines = request.args.get('lines', default=100, type=int)
-        log_file = 'email_campaign.log'
+        log_file = LOG_FILE
         
         if not os.path.exists(log_file):
             return jsonify({'logs': []}), 200
@@ -619,8 +701,9 @@ def get_system_logs():
 def clear_system_logs():
     """Clear system logs"""
     try:
-        log_file = 'email_campaign.log'
+        log_file = LOG_FILE
         # Open in write mode to truncate
+        os.makedirs(os.path.dirname(log_file) or '.', exist_ok=True)
         with open(log_file, 'w') as f:
             f.write(f"{datetime.now()} - System - INFO - Logs cleared by user\n")
         return jsonify({'success': True, 'message': 'Logs cleared'}), 200
