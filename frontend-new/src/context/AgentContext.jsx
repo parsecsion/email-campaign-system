@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ROLES, AVAILABLE_MODELS, DEFAULT_MODEL } from '@/lib/constants';
+import api from '@/utils/api';
 
 const AgentContext = createContext();
 
@@ -57,14 +58,13 @@ export const AgentProvider = ({ children }) => {
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const importApi = (await import('@/utils/api')).default;
-                const res = await importApi.get('/api/settings');
+                const res = await api.get('/api/settings');
                 const s = res.data.settings || {};
 
                 if (s.agent_models) {
                     let customModels = s.agent_models;
                     if (typeof customModels === 'string') {
-                        try { customModels = JSON.parse(customModels); } catch (e) { }
+                        try { customModels = JSON.parse(customModels); } catch { }
                     }
                     if (Array.isArray(customModels)) {
                         // Merge custom (isCustom: true) with constant AVAILABLE_MODELS
@@ -222,8 +222,7 @@ export const AgentProvider = ({ children }) => {
 
             // 2. Call API
             // Use provided model or default
-            const importApi = (await import('@/utils/api')).default;
-            const res = await importApi.post('/api/agent/chat', {
+            const res = await api.post('/api/agent/chat', {
                 messages: historyPayload,
                 model: model // Optional, backend handles default
             });
