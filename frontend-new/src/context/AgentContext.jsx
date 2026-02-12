@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ROLES, AVAILABLE_MODELS, DEFAULT_MODEL } from '@/lib/constants';
+import api from '@/utils/api';
 
 const AgentContext = createContext();
 
@@ -57,14 +58,13 @@ export const AgentProvider = ({ children }) => {
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const importApi = (await import('@/utils/api')).default;
-                const res = await importApi.get('/api/settings');
+                const res = await api.get('/api/settings');
                 const s = res.data.settings || {};
 
                 if (s.agent_models) {
                     let customModels = s.agent_models;
                     if (typeof customModels === 'string') {
-                        try { customModels = JSON.parse(customModels); } catch (e) { }
+                        try { customModels = JSON.parse(customModels); } catch { }
                     }
                     if (Array.isArray(customModels)) {
                         // Merge custom (isCustom: true) with constant AVAILABLE_MODELS
@@ -157,6 +157,22 @@ export const AgentProvider = ({ children }) => {
         }));
     };
 
+
+    const appendMessageToSession = (sessionId, message) => {
+        if (!sessionId) return;
+
+        setSessions(prev => prev.map(session => {
+            if (session.id === sessionId) {
+                return {
+                    ...session,
+                    messages: [...session.messages, message],
+                    updatedAt: Date.now()
+                };
+            }
+            return session;
+        }));
+    };
+
     const switchSession = (id) => {
         setCurrentSessionId(id);
         setIsChatOpen(true);
@@ -188,87 +204,38 @@ export const AgentProvider = ({ children }) => {
     const sendMessage = async (content, model = null) => {
         if (!content.trim() || processingSessionId) return;
 
-        // 1. Add User Message
+        // 1. Determine target session and add user message
         const activeId = currentSessionIdRef.current;
-        if (!activeId) {
-            const newId = createNewSession({ role: ROLES.USER, content, timestamp: Date.now() });
-            // For new session, set processing ID immediately
-            setProcessingSessionId(newId);
-        } else {
+        const targetSessionId = activeId || createNewSession({ role: ROLES.USER, content, timestamp: Date.now() });
+
+        if (activeId) {
             addMessage(ROLES.USER, content);
-            setProcessingSessionId(activeId);
         }
 
-        try {
-            // Get fresh session state (or create temporary history if new)
-            // Note: addMessage is async in terms of React state, so we manually construct the payload
-            // We use the ID effectively active at start of request
-            const targetSessionId = activeId || currentSessionIdRef.current;
+        setProcessingSessionId(targetSessionId);
 
+        try {
             const currentSession = sessions.find(s => s.id === targetSessionId);
             const currentHistory = currentSession ? currentSession.messages : [];
 
-            // If we just created a session, currentSession might not be updated in closure yet, 
-            // but for a new session we know it only has the one message we just added (or passed to createNewSession)
-            // Ideally we'd wait for state, but for now we construct payload carefully.
+            const historyPayload = activeId
+                ? [...currentHistory, { role: ROLES.USER, content }]
+                : [{ role: ROLES.USER, content }];
 
-            let historyPayload = [];
-            if (!activeId) {
-                // New session case: history is just the new message
-                historyPayload = [{ role: ROLES.USER, content }];
-            } else {
-                historyPayload = [...currentHistory, { role: ROLES.USER, content }];
-            }
-
-            // 2. Call API
-            // Use provided model or default
-            const importApi = (await import('@/utils/api')).default;
-            const res = await importApi.post('/api/agent/chat', {
+            const res = await api.post('/api/agent/chat', {
                 messages: historyPayload,
                 model: model // Optional, backend handles default
             });
 
-            // 3. Add Assistant Response
             const { content: aiContent, meta } = res.data;
-
-            // Ensure we add message to the session that initiated the request
-            // (Even if user switched away, we want the response to go to the original session)
-            // But addMessage functionality relies on currentSessionIdRef... 
-            // Actually, addMessage uses currentSessionIdRef. If user switched, activeId changed.
-            // We need a way to add message to a SPECIFIC session.
-
-            // NOTE: The current addMessage implementation defaults to currentSessionIdRef. 
-            // We should ideally refactor addMessage to accept an ID, but for now let's stick to the plan:
-            // "Agent loading state" was the main issue. 
-            // If we want response to go to background session, we need to hack addMessage or `setSessions` directly here.
-
-            // Let's modify setSessions directly to ensure correct target
             const newMessage = { role: ROLES.ASSISTANT, content: aiContent, type: 'text', data: null, meta, timestamp: Date.now() };
-
-            setSessions(prev => prev.map(session => {
-                if (session.id === targetSessionId) {
-                    return {
-                        ...session,
-                        messages: [...session.messages, newMessage],
-                        updatedAt: Date.now()
-                    };
-                }
-                return session;
-            }));
+            appendMessageToSession(targetSessionId, newMessage);
 
         } catch (error) {
             console.error(error);
             const errorMsg = error.response?.data?.error || error.message;
-            // Same here, add error to target session
-            const targetSessionId = activeId || currentSessionIdRef.current;
             const errorPayload = { role: ROLES.ASSISTANT, content: `System Error: ${errorMsg}`, type: 'error', timestamp: Date.now() };
-
-            setSessions(prev => prev.map(session => {
-                if (session.id === targetSessionId) {
-                    return { ...session, messages: [...session.messages, errorPayload], updatedAt: Date.now() };
-                }
-                return session;
-            }));
+            appendMessageToSession(targetSessionId, errorPayload);
 
         } finally {
             setProcessingSessionId(null);
