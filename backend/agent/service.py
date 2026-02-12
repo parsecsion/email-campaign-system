@@ -3,7 +3,7 @@ import json
 import logging
 import hashlib
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from openai import OpenAI
 from agent.tools import AgentTools
 
@@ -24,6 +24,8 @@ else:
     logger.warning(
         "OpenRouter/OpenAI API key not configured; AgentService will be disabled for this deployment."
     )
+
+CONFIRMATION_TTL_SECONDS = int(os.getenv("AGENT_CONFIRMATION_TTL_SECONDS", "600"))
 
 SYSTEM_PROMPT = """
 You are the AI Commander for the Email Campaign System.
@@ -88,6 +90,7 @@ class AgentService:
             "tool": tool_name,
             "args_hash": self._args_hash(args),
             "created_at": datetime.utcnow().isoformat(),
+            "expires_at": (datetime.utcnow() + timedelta(seconds=CONFIRMATION_TTL_SECONDS)).isoformat(),
         }
         return confirmation_id
 
@@ -96,6 +99,18 @@ class AgentService:
         record = self.pending_confirmations.get(key)
         if not record:
             return None
+
+        expires_at_raw = record.get("expires_at")
+        if expires_at_raw:
+            try:
+                expires_at = datetime.fromisoformat(expires_at_raw)
+                if datetime.utcnow() > expires_at:
+                    self.pending_confirmations.pop(key, None)
+                    return None
+            except ValueError:
+                self.pending_confirmations.pop(key, None)
+                return None
+
         if record.get("confirmation_id") != confirmation_id:
             return None
         return record

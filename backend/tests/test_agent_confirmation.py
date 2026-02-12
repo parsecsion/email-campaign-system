@@ -138,3 +138,18 @@ def test_wrong_confirmation_token_does_not_execute_sensitive_tool(monkeypatch):
     second_token = second["meta"]["confirmation_request"]["confirmation_id"]
     assert second_token
     assert second_token != original_token
+
+
+def test_expired_confirmation_token_is_rejected_and_purged():
+    service = AgentService()
+    service.pending_confirmations['admin@example.com'] = {
+        'confirmation_id': 'expired-token',
+        'tool': 'delete_interview',
+        'args_hash': 'hash',
+        'created_at': '2000-01-01T00:00:00',
+        'expires_at': '2000-01-01T00:10:00',
+    }
+
+    found = service._get_pending_confirmation('admin@example.com', 'expired-token')
+    assert found is None
+    assert 'admin@example.com' not in service.pending_confirmations
