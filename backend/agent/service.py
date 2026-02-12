@@ -1,7 +1,9 @@
 import os
 import json
 import logging
-from datetime import datetime
+import hashlib
+import uuid
+from datetime import datetime, timedelta
 from openai import OpenAI
 from agent.tools import AgentTools
 
@@ -22,6 +24,8 @@ else:
     logger.warning(
         "OpenRouter/OpenAI API key not configured; AgentService will be disabled for this deployment."
     )
+
+CONFIRMATION_TTL_SECONDS = int(os.getenv("AGENT_CONFIRMATION_TTL_SECONDS", "600"))
 
 SYSTEM_PROMPT = """
 You are the AI Commander for the Email Campaign System.
@@ -47,6 +51,7 @@ If you can answer directly, output text.
 class AgentService:
     def __init__(self):
         self.tools = AgentTools()
+        self.pending_confirmations = {}
         self.available_functions = {
             "search_candidates": self.tools.search_candidates,
             "add_candidate": self.tools.add_candidate,
@@ -60,6 +65,60 @@ class AgentService:
         }
     
     
+
+    def _extract_confirmation_id(self, message_history):
+        if not message_history:
+            return None
+
+        last_user_msg = message_history[-1].get("content", "").strip()
+        prefix = "CONFIRMED:"
+        if not last_user_msg.upper().startswith(prefix):
+            return None
+
+        token = last_user_msg[len(prefix):].strip()
+        return token or None
+
+    def _args_hash(self, args):
+        serialized = json.dumps(args, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    def _set_pending_confirmation(self, user_email, tool_name, args):
+        confirmation_id = str(uuid.uuid4())
+        key = user_email or "anonymous"
+        self.pending_confirmations[key] = {
+            "confirmation_id": confirmation_id,
+            "tool": tool_name,
+            "args_hash": self._args_hash(args),
+            "created_at": datetime.utcnow().isoformat(),
+            "expires_at": (datetime.utcnow() + timedelta(seconds=CONFIRMATION_TTL_SECONDS)).isoformat(),
+        }
+        return confirmation_id
+
+    def _get_pending_confirmation(self, user_email, confirmation_id):
+        key = user_email or "anonymous"
+        record = self.pending_confirmations.get(key)
+        if not record:
+            return None
+
+        expires_at_raw = record.get("expires_at")
+        if expires_at_raw:
+            try:
+                expires_at = datetime.fromisoformat(expires_at_raw)
+                if datetime.utcnow() > expires_at:
+                    self.pending_confirmations.pop(key, None)
+                    return None
+            except ValueError:
+                self.pending_confirmations.pop(key, None)
+                return None
+
+        if record.get("confirmation_id") != confirmation_id:
+            return None
+        return record
+
+    def _consume_pending_confirmation(self, user_email):
+        key = user_email or "anonymous"
+        self.pending_confirmations.pop(key, None)
+
     def process_message(self, message_history, model=None, user_email=None):
         """
         Process a user message using the agent loop.
@@ -247,40 +306,47 @@ class AgentService:
             }
 
             if response_message.tool_calls:
-                # Check for sensitive tools (Confirmation Interceptor)
-                # First, check if the user just confirmed this action
-                last_user_msg = message_history[-1].get('content', '') if message_history else ''
-                normalized_msg = last_user_msg.strip().upper()
-
-                # Treat only explicit structured confirmations from the UI as valid.
-                is_confirmed = False
-                if normalized_msg.startswith("CONFIRMED:"):
-                    is_confirmed = True
-                elif normalized_msg in ["PROCEED", "YES", "CONFIRM", "GO AHEAD", "DO IT", "SURE", "OK", "OKAY"]:
-                    is_confirmed = True
-                # Check for "Yes, ..." patterns
-                elif normalized_msg.startswith("YES,") or normalized_msg.startswith("YES "):
-                    is_confirmed = True
+                # Check for sensitive tools (confirmation interceptor with one-time token)
+                confirmation_id = self._extract_confirmation_id(message_history)
+                pending_confirmation = self._get_pending_confirmation(user_email, confirmation_id) if confirmation_id else None
 
                 for tool_call in response_message.tool_calls:
                     fn_name = tool_call.function.name
                     if fn_name in ["add_candidate", "delete_interview", "schedule_interview", "update_candidate"]:
-                        # If confirmed, skip the interceptor
-                        if is_confirmed:
-                            logger.info(f"Sensitive tool {fn_name} allow-listed by user confirmation: '{last_user_msg}'")
-                            continue
+                        function_args = json.loads(tool_call.function.arguments)
+                        args_hash = self._args_hash(function_args)
+
+                        if pending_confirmation:
+                            is_match = (
+                                pending_confirmation.get("tool") == fn_name
+                                and pending_confirmation.get("args_hash") == args_hash
+                            )
+                            if is_match:
+                                logger.info(
+                                    "Sensitive tool %s approved by token %s",
+                                    fn_name,
+                                    confirmation_id,
+                                )
+                                self._consume_pending_confirmation(user_email)
+                                continue
 
                         # Pause execution and return confirmation request
                         logger.info(f"Sensitive tool {fn_name} called. Requesting confirmation.")
+                        new_confirmation_id = self._set_pending_confirmation(
+                            user_email=user_email,
+                            tool_name=fn_name,
+                            args=function_args,
+                        )
 
                         meta_data["confirmation_request"] = {
                             "tool": fn_name,
-                            "args": json.loads(tool_call.function.arguments),
-                            "message": f"I need to {fn_name.replace('_',' ')}: {tool_call.function.arguments}"
+                            "args": function_args,
+                            "confirmation_id": new_confirmation_id,
+                            "message": f"I need to {fn_name.replace('_',' ')}: {tool_call.function.arguments}",
                         }
                         return {
                             "content": f"I need your permission to execute {fn_name}.",
-                            "meta": meta_data
+                            "meta": meta_data,
                         }
 
                 messages.append(response_message)
