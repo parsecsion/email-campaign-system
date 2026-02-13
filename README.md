@@ -200,15 +200,3 @@ If you want an ultra-lean public repo, you can keep only:
 - and `scripts/` as a home for any dev utilities you want to showcase.
 
 ---
-
-## What Not to Commit
-
-These are either already ignored or should remain local:
-
-- Local environments: `venv/`, `.env`, `backend/.env`
-- Generated/compiled artifacts: `__pycache__/`, `*.pyc`, `dist/`, `frontend-new/node_modules/`, any `build/` or `coverage` outputs
-- Runtime data: `data/` directory and `*.db` files, `email_campaign.log`, `logs/`
-- TLS material: `ssl/`, `*.pem`, `*.key`, `*.crt`
-
-Keeping these out of the Git history ensures your GitHub repository stays clean and free of secrets.
-
